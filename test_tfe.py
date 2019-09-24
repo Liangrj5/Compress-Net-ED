@@ -40,7 +40,7 @@ class ModelOwner():
 			res.append(tf.convert_to_tensor(temp))
 		return res
 
-	# @tfe.local_computation
+	@tfe.local_computation
 	def provide_weights(self):
 		training_data = None
 		with tf.name_scope('training'):
@@ -48,6 +48,59 @@ class ModelOwner():
 
 		return parameters
 
+class PredictionClient():
+	"""
+	Contains code meant to be executed by a prediction client.
+
+	Args:
+	player_name: `str`, name of the `tfe.player.Player`
+				 representing the data owner
+	build_update_step: `Callable`, the function used to construct
+						 a local federated learning update.
+	"""
+
+	BATCH_SIZE = 20
+
+	def __init__(self, player_name, local_data_file):
+	self.player_name = player_name
+	self.local_data_file = local_data_file
+
+	def _build_data_pipeline(self):
+	"""Build a reproducible tf.data iterator."""
+
+	def normalize(image, label):
+		image = tf.cast(image, tf.float32) / 255.0
+		return image, label
+
+	dataset = tf.data.TFRecordDataset([self.local_data_file])
+	dataset = dataset.map(decode)
+	dataset = dataset.map(normalize)
+	dataset = dataset.repeat()
+	dataset = dataset.batch(self.BATCH_SIZE)
+
+	iterator = dataset.make_one_shot_iterator()
+	return iterator
+
+	@tfe.local_computation
+	def provide_input(self) -> tf.Tensor:
+	"""Prepare input data for prediction."""
+	with tf.name_scope('loading'):
+		prediction_input, expected_result = self._build_data_pipeline().get_next()
+		print_op = tf.print("Expect", expected_result, summarize=self.BATCH_SIZE)
+		with tf.control_dependencies([print_op]):
+		prediction_input = tf.identity(prediction_input)
+
+	with tf.name_scope('pre-processing'):
+		prediction_input = tf.reshape(
+			prediction_input, shape=(self.BATCH_SIZE, ModelOwner.FLATTENED_DIM))
+	return prediction_input
+
+	@tfe.local_computation
+	def receive_output(self, logits: tf.Tensor) -> tf.Operation:
+	with tf.name_scope('post-processing'):
+		prediction = tf.argmax(logits, axis=1)
+		op = tf.print("Result", prediction, summarize=self.BATCH_SIZE)
+		return op
 
 if __name__ == "__main__":
 
@@ -59,10 +112,34 @@ if __name__ == "__main__":
 	# get model parameters as private tensors from model owner
 
 	params = model_owner.provide_weights()
-	# with tf.Session() as sess:
-	# 	# sess.run(tfe.global_variables_initializer())
-	# 	print(sess.run(params[3]))
-	print(params)
-	print(params[3])
-	c	= params[3]
 
+	# we'll use the same parameters for each prediction so we cache them to
+	# avoid re-training each time
+	cache_updater, params = tfe.cache(params)
+
+	with tfe.protocol.SecureNN():
+		# get prediction input from client
+		x = prediction_client.provide_input()
+
+		model = tfe.keras.Sequential()
+		model.add(tfe.keras.layers.Dense(512, batch_input_shape=x.shape))
+		model.add(tfe.keras.layers.Activation('relu'))
+		model.add(tfe.keras.layers.Dense(10, activation=None))
+
+		logits = model(x)
+
+	# send prediction output back to client
+	prediction_op = prediction_client.receive_output(logits)
+
+	with tfe.Session(target=session_target) as sess:
+		sess.run(tf.global_variables_initializer(), tag='init')
+
+		print("Training")
+		sess.run(cache_updater, tag='training')
+
+		print("Set trained weights")
+		model.set_weights(params, sess)
+
+	for _ in range(5):
+		print("Predicting")
+		sess.run(prediction_op, tag='prediction')
