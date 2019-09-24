@@ -48,69 +48,75 @@ class ModelOwner():
 
 		return parameters
 
+
 class PredictionClient():
 	"""
 	Contains code meant to be executed by a prediction client.
 
 	Args:
-	player_name: `str`, name of the `tfe.player.Player`
-				 representing the data owner
-	build_update_step: `Callable`, the function used to construct
-						 a local federated learning update.
+		player_name: `str`, name of the `tfe.player.Player`
+								 representing the data owner
+		build_update_step: `Callable`, the function used to construct
+											 a local federated learning update.
 	"""
 
 	BATCH_SIZE = 20
 
 	def __init__(self, player_name, local_data_file):
-	self.player_name = player_name
-	self.local_data_file = local_data_file
+		self.player_name = player_name
+		self.local_data_file = local_data_file
 
 	def _build_data_pipeline(self):
-	"""Build a reproducible tf.data iterator."""
+		"""Build a reproducible tf.data iterator."""
 
-	def normalize(image, label):
-		image = tf.cast(image, tf.float32) / 255.0
-		return image, label
+		def normalize(image, label):
+			image = tf.cast(image, tf.float32) / 255.0
+			return image, label
 
-	dataset = tf.data.TFRecordDataset([self.local_data_file])
-	dataset = dataset.map(decode)
-	dataset = dataset.map(normalize)
-	dataset = dataset.repeat()
-	dataset = dataset.batch(self.BATCH_SIZE)
+		dataset = tf.data.TFRecordDataset([self.local_data_file])
+		dataset = dataset.map(decode)
+		dataset = dataset.map(normalize)
+		dataset = dataset.repeat()
+		dataset = dataset.batch(self.BATCH_SIZE)
 
-	iterator = dataset.make_one_shot_iterator()
-	return iterator
+		iterator = dataset.make_one_shot_iterator()
+		return iterator
 
 	@tfe.local_computation
 	def provide_input(self) -> tf.Tensor:
-	"""Prepare input data for prediction."""
-	with tf.name_scope('loading'):
-		prediction_input, expected_result = self._build_data_pipeline().get_next()
-		print_op = tf.print("Expect", expected_result, summarize=self.BATCH_SIZE)
-		with tf.control_dependencies([print_op]):
-		prediction_input = tf.identity(prediction_input)
+		"""Prepare input data for prediction."""
+		with tf.name_scope('loading'):
+			prediction_input, expected_result = self._build_data_pipeline().get_next()
+			print_op = tf.print("Expect", expected_result, summarize=self.BATCH_SIZE)
+			with tf.control_dependencies([print_op]):
+				prediction_input = tf.identity(prediction_input)
 
-	with tf.name_scope('pre-processing'):
-		prediction_input = tf.reshape(
-			prediction_input, shape=(self.BATCH_SIZE, ModelOwner.FLATTENED_DIM))
-	return prediction_input
+		with tf.name_scope('pre-processing'):
+			prediction_input = tf.reshape(
+					prediction_input, shape=(self.BATCH_SIZE, ModelOwner.FLATTENED_DIM))
+		return prediction_input
 
 	@tfe.local_computation
 	def receive_output(self, logits: tf.Tensor) -> tf.Operation:
-	with tf.name_scope('post-processing'):
-		prediction = tf.argmax(logits, axis=1)
-		op = tf.print("Result", prediction, summarize=self.BATCH_SIZE)
-		return op
+		with tf.name_scope('post-processing'):
+			prediction = tf.argmax(logits, axis=1)
+			op = tf.print("Result", prediction, summarize=self.BATCH_SIZE)
+			return op
+
 
 if __name__ == "__main__":
 
+	logging.basicConfig(level=logging.DEBUG)
 
 	model_owner = ModelOwner(
 			player_name="model-owner",
 			local_data_file="./data/train.tfrecord")
 
-	# get model parameters as private tensors from model owner
+	prediction_client = PredictionClient(
+			player_name="prediction-client",
+			local_data_file="./data/test.tfrecord")
 
+	# get model parameters as private tensors from model owner
 	params = model_owner.provide_weights()
 
 	# we'll use the same parameters for each prediction so we cache them to
@@ -140,6 +146,6 @@ if __name__ == "__main__":
 		print("Set trained weights")
 		model.set_weights(params, sess)
 
-	for _ in range(5):
-		print("Predicting")
-		sess.run(prediction_op, tag='prediction')
+		for _ in range(5):
+			print("Predicting")
+			sess.run(prediction_op, tag='prediction')
