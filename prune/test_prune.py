@@ -24,8 +24,19 @@ def receive_output(average: tf.Tensor) -> tf.Operation:
 inputs = provide_input(player_name='inputter-0')
 threshold = provide_threshold(player_name='threshold_inputter')
 result = inputs - threshold
-
+# result = tfe.less(result, 0.)
 result_op = receive_output(result)
 
+
+
+
+# a = np.random.rand(10,1)
+# a = tf.constant(a , dtype = tf.float32)
+# t= tf.less(a, 0.5)
+# t = tf.cast(t, tf.float32)
+# c = t * a
+
+
+# mask = 
 with tfe.Session() as sess:
 	sess.run(result_op, tag='prune')
