@@ -5,6 +5,7 @@ import numpy as np
 @tfe.local_computation(name_scope='provide_input')
 def provide_input() -> tf.Tensor:
 	# pick random tensor to be averaged
+	tf.set_random_seed(0)
 	return tf.random_normal(shape=(1,10))
 
 @tfe.local_computation(name_scope='provide_input')
@@ -23,8 +24,14 @@ def receive_output(average: tf.Tensor) -> tf.Operation:
 
 inputs = provide_input(player_name='inputter-0')
 threshold = provide_threshold(player_name='threshold_inputter')
-result = inputs - threshold
-# result = tfe.less(result, 0.)
+# result = inputs - threshold
+result = inputs
+
+
+from tf_encrypted import get_protocol
+result = get_protocol().relu(result)
+
+
 result_op = receive_output(result)
 
 
