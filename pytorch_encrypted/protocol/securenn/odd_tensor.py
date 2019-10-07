@@ -139,10 +139,10 @@ def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 
 		def __getitem__(self, slc):
 			return OddDenseTensor(self.value[slc])
-### ----------------- testing here ----------------------###
-
+		### do not test equal tfe
 		def __add__(self, other):
 			return self.add(other)
+### ----------------- testing here ----------------------###
 
 		def __sub__(self, other):
 			return self.sub(other)
@@ -150,35 +150,54 @@ def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 		def add(self, other):
 			"""Add other to this tensor."""
 			x, y = _lift(self, other)
-			input()
 			bitlength = math.ceil(math.log2(master_factory.modulus))
 
 			x_value = x.value
 			y_value = y.value
 			z = x_value + y_value
+			wrapped_around = _lessthan_as_unsigned(-2 - y_value, x_value, bitlength)
+			z += wrapped_around
 
 
-			with tf.name_scope('add'):
+
+
+			# the below avoids redundant seed expansion; can be removed once
+			# we have a (per-device) caching mechanism in place
+
+			### I don't understand
+			# we want to compute whether we wrapped around, ie `pos(x) + pos(y) >= m - 1`,
+			# for correction purposes which, since `m - 1 == 1` for signed integers, can be
+			# rewritten as:
+			#	 -> `pos(x) >= m - 1 - pos(y)`
+			#	 -> `m - 1 - pos(y) - 1 < pos(x)`
+			#	 -> `-1 - pos(y) - 1 < pos(x)`
+			#	 -> `-2 - pos(y) < pos(x)`
+
+
+			return OddDenseTensor(z)
+
+
+		def sub(self, other):
+			"""Subtract other from this tensor."""
+			x, y = _lift(self, other)
+			bitlength = math.ceil(math.log2(master_factory.modulus))
+
+			with tf.name_scope('sub'):
 
 				# the below avoids redundant seed expansion; can be removed once
 				# we have a (per-device) caching mechanism in place
 				x_value = x.value
 				y_value = y.value
 
-				z = x_value + y_value
+				z = x_value - y_value
 
-				with tf.name_scope('correct_wrap'):
-### I don't understand
-# we want to compute whether we wrapped around, ie `pos(x) + pos(y) >= m - 1`,
-# for correction purposes which, since `m - 1 == 1` for signed integers, can be
-# rewritten as:
-#	 -> `pos(x) >= m - 1 - pos(y)`
-#	 -> `m - 1 - pos(y) - 1 < pos(x)`
-#	 -> `-1 - pos(y) - 1 < pos(x)`
-#	 -> `-2 - pos(y) < pos(x)`
+				with tf.name_scope('correct-wrap'):
 
-					wrapped_around = _lessthan_as_unsigned(-2 - y_value, x_value, bitlength)
-					z += wrapped_around
+					# we want to compute whether we wrapped around, ie `pos(x) - pos(y) < 0`,
+					# for correction purposes which can be rewritten as
+					#	-> `pos(x) < pos(y)`
+					wrapped_around = _lessthan_as_unsigned(x_value, y_value, bitlength)
+					z -= wrapped_around
 
 			return OddDenseTensor(z)
 
@@ -217,6 +236,25 @@ def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 		@property
 		def support(self):
 			return [self._value]
+
+
+	def _lessthan_as_unsigned(x, y, bitlength):
+		"""
+		Performs comparison `x < y` on signed integers *as if* they were unsigned,
+		e.g. `1 < -1`. Taken from Section 2-12, page 23, of
+		[Hacker's Delight](https://www.hackersdelight.org/).
+		"""
+		x_np = x.numpy()
+		y_np = y.numpy()
+
+		not_x = np.invert(x_np)
+		lhs = np.bitwise_and(not_x, y_np)
+		rhs = np.bitwise_and(np.bitwise_or(not_x, y_np), x_np - y_np)
+		z = np.right_shift(np.bitwise_or(lhs, rhs), bitlength - 1)
+
+		z = np.bitwise_and(z, np.ones_like(z))
+
+		return torch.from_numpy(z) 
 
 	### this fun is not compete by author
 	def _lift(x, y) -> Tuple[OddTensor, OddTensor]:
@@ -277,5 +315,5 @@ x = oddint32_factory.tensor(torch.tensor([3, 3], dtype=torch.int32))
 y = oddint32_factory.tensor(torch.tensor([3, 3], dtype=torch.int32))
 # y = oddint64_factory.tensor(torch.tensor([2, 2], dtype=torch.int64))
 # OddDenseTensor<- OddTensor <- AbstractTensor
-print(x + 3)
+print(x + y)
 # print(type(x))
