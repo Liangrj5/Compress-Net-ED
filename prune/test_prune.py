@@ -2,6 +2,13 @@ import tensorflow as tf
 import tf_encrypted as tfe
 import numpy as np 
 
+
+# To implement compare function
+# Input: weight matrix W, threshold t,
+# Output mast matrix M with bool value
+# and a pruned weight matrix W_prun = W * M
+
+
 @tfe.local_computation(name_scope='provide_input')
 def provide_input() -> tf.Tensor:
 	# pick random tensor to be averaged
@@ -34,15 +41,7 @@ result = get_protocol().relu(result)
 
 result_op = receive_output(result)
 
-
-
-
-# a = np.random.rand(10,1)
-# a = tf.constant(a , dtype = tf.float32)
-# t= tf.less(a, 0.5)
-# t = tf.cast(t, tf.float32)
-# c = t * a
-
+ 
 
 # mask = 
 with tfe.Session() as sess:
