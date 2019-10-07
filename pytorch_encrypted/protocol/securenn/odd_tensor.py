@@ -1,24 +1,18 @@
 # """Odd tensors abstraction. For internal use with SecureNN subprotocols."""
 from __future__ import absolute_import
-
 from typing import Tuple, Optional
 # from functools import partial
 
 import abc
 import math
 
+import torch
 import numpy as np
-# import tensorflow as tf
 
 # from ...tensor.factory import AbstractTensor
 from factory import AbstractTensor
 # from ...tensor.shared import binarize
 # from ...operations import secure_random
-
-import torch
-
-# x = oddint32_factory.tensor()
-# x = Factory.tensor(tf.constant([2, -2], dtype=torch.int64))
 
 def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 	"""
@@ -110,15 +104,15 @@ def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 			return master_factory
 
 		### these fun like unuse
-		# @property
-		# @abc.abstractproperty
-		# def value(self) -> torch.Tensor:
-		# 	pass
+		@property
+		@abc.abstractproperty
+		def value(self) -> torch.Tensor:
+			pass
 
-		# @property
-		# @abc.abstractproperty
-		# def shape(self):
-		# 	pass
+		@property
+		@abc.abstractproperty
+		def shape(self):
+			pass
 
 		def identity(self):
 			value = self.value.clone()
@@ -142,7 +136,6 @@ def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 		### do not test equal tfe
 		def __add__(self, other):
 			return self.add(other)
-### ----------------- testing here ----------------------###
 
 		def __sub__(self, other):
 			return self.sub(other)
@@ -157,8 +150,6 @@ def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 			z = x_value + y_value
 			wrapped_around = _lessthan_as_unsigned(-2 - y_value, x_value, bitlength)
 			z += wrapped_around
-
-
 
 
 			# the below avoids redundant seed expansion; can be removed once
@@ -182,24 +173,25 @@ def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 			x, y = _lift(self, other)
 			bitlength = math.ceil(math.log2(master_factory.modulus))
 
-			with tf.name_scope('sub'):
-
-				# the below avoids redundant seed expansion; can be removed once
-				# we have a (per-device) caching mechanism in place
-				x_value = x.value
-				y_value = y.value
-
-				z = x_value - y_value
-
-				with tf.name_scope('correct-wrap'):
-
-					# we want to compute whether we wrapped around, ie `pos(x) - pos(y) < 0`,
-					# for correction purposes which can be rewritten as
-					#	-> `pos(x) < pos(y)`
-					wrapped_around = _lessthan_as_unsigned(x_value, y_value, bitlength)
-					z -= wrapped_around
+			x_value = x.value
+			y_value = y.value
+			z = x_value - y_value
+			wrapped_around = _lessthan_as_unsigned(-2 - y_value, x_value, bitlength)
+			z += wrapped_around
 
 			return OddDenseTensor(z)
+
+### ----------------- testing here ----------------------###
+		### these fun not modify
+		def bits(self, factory=None):
+			if factory is None:
+				return OddDenseTensor(binarize(self.value))
+			return factory.tensor(binarize(self.value))
+
+		def cast(self, factory):
+			if factory is master_factory:
+				return self
+			return factory.tensor(self.value)
 
 	class OddDenseTensor(OddTensor):
 		"""
@@ -237,24 +229,35 @@ def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 		def support(self):
 			return [self._value]
 
+	### not modify
+	# class OddUniformTensor(OddTensor):
+	# 	"""
+	# 	Represents a tensor with uniform values defined implicitly through a seed.
 
-	def _lessthan_as_unsigned(x, y, bitlength):
-		"""
-		Performs comparison `x < y` on signed integers *as if* they were unsigned,
-		e.g. `1 < -1`. Taken from Section 2-12, page 23, of
-		[Hacker's Delight](https://www.hackersdelight.org/).
-		"""
-		x_np = x.numpy()
-		y_np = y.numpy()
+	# 	Internal use only.
+	# 	"""
 
-		not_x = np.invert(x_np)
-		lhs = np.bitwise_and(not_x, y_np)
-		rhs = np.bitwise_and(np.bitwise_or(not_x, y_np), x_np - y_np)
-		z = np.right_shift(np.bitwise_or(lhs, rhs), bitlength - 1)
+	# 	def __init__(self, shape, seed):
+	# 		self._seed = seed
+	# 		self._shape = shape
 
-		z = np.bitwise_and(z, np.ones_like(z))
+	# 	@property
+	# 	def shape(self):
+	# 		return self._shape
 
-		return torch.from_numpy(z) 
+	# 	@property
+	# 	def value(self) -> tf.Tensor:
+	# 		# TODO(Morten) result should be stored in a (per-device) cache
+	# 		with tf.name_scope('expand-seed'):
+	# 			sampler = partial(secure_random.seeded_random_uniform, seed=self._seed)
+	# 			value = _construct_value_from_sampler(sampler=sampler, hape=self._shape)
+	# 			return value
+	# 	@property
+	# 	def support(self):
+	# 		return [self._seed]
+
+
+
 
 	### this fun is not compete by author
 	def _lift(x, y) -> Tuple[OddTensor, OddTensor]:
@@ -298,22 +301,40 @@ def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 		return value
 
 
+	def _lessthan_as_unsigned(x, y, bitlength):
+		"""
+		Performs comparison `x < y` on signed integers *as if* they were unsigned,
+		e.g. `1 < -1`. Taken from Section 2-12, page 23, of
+		[Hacker's Delight](https://www.hackersdelight.org/).
+		"""
+		x_np = x.numpy()
+		y_np = y.numpy()
+
+		not_x = np.invert(x_np)
+		lhs = np.bitwise_and(not_x, y_np)
+		rhs = np.bitwise_and(np.bitwise_or(not_x, y_np), x_np - y_np)
+		z = np.right_shift(np.bitwise_or(lhs, rhs), bitlength - 1)
+
+		z = np.bitwise_and(z, np.ones_like(z))
+
+		return torch.from_numpy(z) 
+
 	def _map_minusone_to_zero(value):
 		""" Maps all -1 values to zero. """
 		zeros = torch.zeros_like(value)
 		return torch.where(value == -1, zeros, value)
 
 
-
 	return master_factory
+
 
 oddint32_factory = odd_factory(torch.int32)
 oddint64_factory = odd_factory(torch.int64)
-# class Factor
-# print(oddint32_factory)
-x = oddint32_factory.tensor(torch.tensor([3, 3], dtype=torch.int32))
-y = oddint32_factory.tensor(torch.tensor([3, 3], dtype=torch.int32))
-# y = oddint64_factory.tensor(torch.tensor([2, 2], dtype=torch.int64))
-# OddDenseTensor<- OddTensor <- AbstractTensor
-print(x + y)
+
+
 # print(type(x))
+if __name__ == '__main__':
+
+	x = oddint32_factory.tensor(torch.tensor([3, -11], dtype=torch.int32))
+	y = oddint32_factory.tensor(torch.tensor([3, 1], dtype=torch.int32))
+	print(x - y)
