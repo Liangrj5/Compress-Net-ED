@@ -104,7 +104,6 @@ def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 		Implements basic functionality needed by SecureNN subprotocols from a few
 		abstract properties implemented by concrete types below.
 		"""
-### ----------------- testing here ----------------------###
 
 		@property
 		def factory(self):
@@ -131,15 +130,16 @@ def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 
 
 		def __repr__(self) -> str:
-			return '{}'.format(self.value)
-			# return '{}(size={}, NATIVE_TYPE={})'.format(
-			# 		type(self),
-			# 		self.size(),
-			# 		NATIVE_TYPE,
-			# )
+			# return '{}(class = {}, size={}, NATIVE_TYPE={})'.format(self.value, type(self),
+			# 						self.size(),
+			# 						NATIVE_TYPE,
+			# )			
+			return '{}(class = {})'.format(self.value, type(self))
+
 
 		def __getitem__(self, slc):
 			return OddDenseTensor(self.value[slc])
+### ----------------- testing here ----------------------###
 
 		def __add__(self, other):
 			return self.add(other)
@@ -150,7 +150,13 @@ def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 		def add(self, other):
 			"""Add other to this tensor."""
 			x, y = _lift(self, other)
+			input()
 			bitlength = math.ceil(math.log2(master_factory.modulus))
+
+			x_value = x.value
+			y_value = y.value
+			z = x_value + y_value
+
 
 			with tf.name_scope('add'):
 
@@ -162,17 +168,16 @@ def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 				z = x_value + y_value
 
 				with tf.name_scope('correct_wrap'):
+### I don't understand
+# we want to compute whether we wrapped around, ie `pos(x) + pos(y) >= m - 1`,
+# for correction purposes which, since `m - 1 == 1` for signed integers, can be
+# rewritten as:
+#	 -> `pos(x) >= m - 1 - pos(y)`
+#	 -> `m - 1 - pos(y) - 1 < pos(x)`
+#	 -> `-1 - pos(y) - 1 < pos(x)`
+#	 -> `-2 - pos(y) < pos(x)`
 
-					# we want to compute whether we wrapped around, ie `pos(x) + pos(y) >= m - 1`,
-					# for correction purposes which, since `m - 1 == 1` for signed integers, can be
-					# rewritten as:
-					#	 -> `pos(x) >= m - 1 - pos(y)`
-					#	 -> `m - 1 - pos(y) - 1 < pos(x)`
-					#	 -> `-1 - pos(y) - 1 < pos(x)`
-					#	 -> `-2 - pos(y) < pos(x)`
-					wrapped_around = _lessthan_as_unsigned(-2 - y_value,
-																								 x_value,
-																								 bitlength)
+					wrapped_around = _lessthan_as_unsigned(-2 - y_value, x_value, bitlength)
 					z += wrapped_around
 
 			return OddDenseTensor(z)
@@ -213,6 +218,7 @@ def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 		def support(self):
 			return [self._value]
 
+	### this fun is not compete by author
 	def _lift(x, y) -> Tuple[OddTensor, OddTensor]:
 		"""
 		Attempts to lift x and y to compatible OddTensors for further processing.
@@ -223,13 +229,13 @@ def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 					x.factory, y.factory)
 			return x, y
 
+
+		### there is not compete by author
 		if isinstance(x, OddTensor):
-
 			if isinstance(y, int):
+				print('ccc')
 				return x, x.factory.tensor(np.array([y]))
-
 		if isinstance(y, OddTensor):
-
 			if isinstance(x, int):
 				return y.factory.tensor(np.array([x])), y
 
@@ -264,10 +270,12 @@ def odd_factory(NATIVE_TYPE):	# pylint: disable=invalid-name
 	return master_factory
 
 oddint32_factory = odd_factory(torch.int32)
+oddint64_factory = odd_factory(torch.int64)
 # class Factor
 # print(oddint32_factory)
-x = oddint32_factory.tensor(torch.tensor([2, -1], dtype=torch.int32))
+x = oddint32_factory.tensor(torch.tensor([3, 3], dtype=torch.int32))
+y = oddint32_factory.tensor(torch.tensor([3, 3], dtype=torch.int32))
+# y = oddint64_factory.tensor(torch.tensor([2, 2], dtype=torch.int64))
 # OddDenseTensor<- OddTensor <- AbstractTensor
-
-print(x.size(0))
+print(x + 3)
 # print(type(x))
