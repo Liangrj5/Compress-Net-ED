@@ -335,6 +335,6 @@ oddint64_factory = odd_factory(torch.int64)
 # print(type(x))
 if __name__ == '__main__':
 
-	x = oddint32_factory.tensor(torch.tensor([3, -11], dtype=torch.int32))
-	y = oddint32_factory.tensor(torch.tensor([3, 1], dtype=torch.int32))
-	print(x - y)
+	x = oddint64_factory.tensor(torch.tensor([-1, 17], dtype=torch.int64))
+	y = oddint64_factory.tensor(torch.tensor([-1, 2**63 -1], dtype=torch.int64))
+	print(x + y)
