@@ -4,9 +4,7 @@ import functools
 from typing import Optional, Any, Callable
 from types import TracebackType
 
-import tensorflow as tf
 import torch
-
 from ..tensor.factory import AbstractTensor
 
 
@@ -41,57 +39,57 @@ class Protocol(ABC):
 
 	@property
 	@abstractmethod
-	def initializer(self) -> tf.Operation:
+	def initializer(self): #-> tf.Operation:
 		pass
 
 
-def set_protocol(prot: Protocol) -> None:
-	"""
-	set_protocol(prot)
+# def set_protocol(prot: Protocol) -> None:
+# 	"""
+# 	set_protocol(prot)
 
-	Sets the global protocol.
-	E.g. :class:`~tf_encrypted.protocol.securenn.SecureNN` or
-	:class:`~tf_encrypted.protocol.pond.Pond`.
+# 	Sets the global protocol.
+# 	E.g. :class:`~tf_encrypted.protocol.securenn.SecureNN` or
+# 	:class:`~tf_encrypted.protocol.pond.Pond`.
 
-	.. code-block::python
-			tfe.set_protocol(tfe.protocol.secureNN())
+# 	.. code-block::python
+# 			tfe.set_protocol(tfe.protocol.secureNN())
 
-	:param Protocol prot: An instance of a tfe protocol.
-	"""
-	global __PROTOCOL__	# pylint: disable=invalid-name
-	__PROTOCOL__ = prot
-
-
-def get_protocol() -> Optional[Protocol]:
-	"""
-	get_protocol() -> Protocol or None
-
-	Returns the current global protocol.
-	"""
-	return __PROTOCOL__
+# 	:param Protocol prot: An instance of a tfe protocol.
+# 	"""
+# 	global __PROTOCOL__	# pylint: disable=invalid-name
+# 	__PROTOCOL__ = prot
 
 
-def memoize(func: Callable) -> Callable:
-	"""
-	memoize(func) -> Callable
+# def get_protocol() -> Optional[Protocol]:
+# 	"""
+# 	get_protocol() -> Protocol or None
 
-	Decorates a function for memoization, which explicitly caches the function's
-	output.
+# 	Returns the current global protocol.
+# 	"""
+# 	return __PROTOCOL__
 
-	:param Callable func: The function to memoize
-	"""
-	@functools.wraps(func)
-	def cache_nodes(self: Protocol, *args: Any, **kwargs: Any) -> AbstractTensor:
-		args = tuple(tuple(x) if isinstance(x, list) else x for x in args)
-		node_key = (func.__name__, args, tuple(sorted(kwargs.items())))
 
-		cached_result = nodes.get(node_key, None)
-		if cached_result is not None:
-			return cached_result
+# def memoize(func: Callable) -> Callable:
+# 	"""
+# 	memoize(func) -> Callable
 
-		result = func(self, *args, **kwargs)
+# 	Decorates a function for memoization, which explicitly caches the function's
+# 	output.
 
-		nodes[node_key] = result
-		return result
+# 	:param Callable func: The function to memoize
+# 	"""
+# 	@functools.wraps(func)
+# 	def cache_nodes(self: Protocol, *args: Any, **kwargs: Any) -> AbstractTensor:
+# 		args = tuple(tuple(x) if isinstance(x, list) else x for x in args)
+# 		node_key = (func.__name__, args, tuple(sorted(kwargs.items())))
 
-	return cache_nodes
+# 		cached_result = nodes.get(node_key, None)
+# 		if cached_result is not None:
+# 			return cached_result
+
+# 		result = func(self, *args, **kwargs)
+
+# 		nodes[node_key] = result
+# 		return result
+
+# 	return cache_nodes

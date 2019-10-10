@@ -13,26 +13,25 @@ import random
 import sys
 
 import numpy as np
-import tensorflow as tf
 import torch
 
 # from ...utils import wrap_in_variables
 # from ...tensor.helpers import inverse
-# from ...tensor.factory import (
-# 		AbstractFactory,
-# 		AbstractTensor,
-# 		AbstractConstant,
-# 		AbstractVariable,
-# 		AbstractPlaceholder,
-# )
-# from ...tensor.fixed import FixedpointConfig, _validate_fixedpoint_config
+from ...tensor.factory import (
+		AbstractFactory,
+		AbstractTensor,
+		AbstractConstant,
+		AbstractVariable,
+		AbstractPlaceholder,
+)
+from ...tensor.fixed import FixedpointConfig, _validate_fixedpoint_config
 # from ...tensor import int100factory, fixed100
-# from ...tensor import int64factory, fixed64
+from ...tensor import int64factory#, fixed64
 # from ...player import Player
 from ...config import get_config, pytorch_supports_int64
 # from ...queue.fifo import AbstractFIFOQueue
 from ..protocol import Protocol#, memoize, nodes
-# from .triple_sources import OnlineTripleSource
+from .triple_sources import OnlineTripleSource
 
 
 # TFEData = Union[np.ndarray, tf.Tensor]
@@ -76,7 +75,7 @@ class Pond(Protocol):
 		config = get_config()
 		self.server_0 = config.get_player(server_0 if server_0 else "server0")
 		self.server_1 = config.get_player(server_1 if server_1 else "server1")
-		print("iiiiiiiiii")
+
 		if triple_source is None:
 			crypto_producer = config.get_player(crypto_producer if crypto_producer else "server2")
 			crypto_producer = config.get_player(crypto_producer if crypto_producer else "crypto-producer")
@@ -90,27 +89,27 @@ class Pond(Protocol):
 
 				print("rrrrrr")
 				input()
-### ------------------testing here ------------------###
+## ------------------testing here ------------------###
 
-# 			else:
-# 				logging.warning(
-# 						"Falling back to using int100 tensors due to lack of int64 "
-# 						"support. Performance may be improved by installing a version of "
-# 						"TensorFlow supporting this (1.13+ or custom build).")
-# 				tensor_factory = int100factory
+			else:
+				logging.warning(
+						"Falling back to using int100 tensors due to lack of int64 "
+						"support. Performance may be improved by installing a version of "
+						"TensorFlow supporting this (1.13+ or custom build).")
+				tensor_factory = int100factory
 
-# 		if fixedpoint_config is None:
-# 			if tensor_factory is int64factory:
-# 				fixedpoint_config = fixed64
-# 			elif tensor_factory is int100factory:
-# 				fixedpoint_config = fixed100
-# 			else:
-# 				raise ValueError(("Don't know how to pick fixedpoint configuration "
-# 													"for tensor type {}").format(tensor_factory))
+		if fixedpoint_config is None:
+			if tensor_factory is int64factory:
+				fixedpoint_config = fixed64
+			elif tensor_factory is int100factory:
+				fixedpoint_config = fixed100
+			else:
+				raise ValueError(("Don't know how to pick fixedpoint configuration "
+													"for tensor type {}").format(tensor_factory))
 
-# 		_validate_fixedpoint_config(fixedpoint_config, tensor_factory)
-# 		self.fixedpoint_config = fixedpoint_config
-# 		self.tensor_factory = tensor_factory
+		_validate_fixedpoint_config(fixedpoint_config, tensor_factory)
+		self.fixedpoint_config = fixedpoint_config
+		self.tensor_factory = tensor_factory
 
 # 	def define_constant(
 # 			self,
@@ -696,9 +695,10 @@ class Pond(Protocol):
 # 				name_scope=name_scope if name_scope else "output",
 # 		)
 
-# 	@property
-# 	def initializer(self) -> tf.Operation:
-# 		return tf.group(*_initializers)
+	@property
+	def initializer(self):
+		return 1
+	
 
 # 	def clear_initializers(self) -> None:
 # 		del _initializers[:]
