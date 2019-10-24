@@ -1,25 +1,3 @@
-# from keras.models import Sequential
-# from keras.layers import Dense
-
-# model = Sequential()
-
-# model.add(Dense(units=64, activation='relu', input_dim=100))
-# model.add(Dense(units=10, activation='softmax'))
-
-# model.compile(loss='categorical_crossentropy',
-#               optimizer='sgd',
-#               metrics=['accuracy'])
-
-# model.compile(loss=keras.losses.categorical_crossentropy,
-# optimizer=keras.optimizers.SGD(lr=0.01, momentum=0.9, nesterov=True))
-
-# model.fit(x_train, y_train, epochs=5, batch_size=32)
-# # model.train_on_batch(x_batch, y_batch)
-# # loss_and_metrics = model.evaluate(x_test, y_test, batch_size=128)
-# # classes = model.predict(x_test, batch_size=128)
-
-# pylint: disable=missing-docstring
-import unittest
 
 import numpy as np
 import tensorflow as tf
@@ -148,22 +126,9 @@ with tfe.Session() as sess:
 						data_owner.initializer],
 						tag='init')
 	model.fit(x_train, y_train, epochs = 10)
+	# model.save_sparse_weight('./tmp/')
+	# model.save_dense_weight('./tmp/')
+
+	
+	# model.fit(x_train, y_train, epochs = 10)
 	# model.evaluate(x_test, y_test, e= 1, epochs = 10)
-
-
-
-# x_private = tfe.define_private_variable(input_data)
-# output =  model(x_train)
-# output =  model.call(x_train)
-# dy = model._loss.grad(output, y_train)
-# # model.backward(dy)
-
-# print(dy)
-
-
-# loss = loss_fun(output, t_private)
-
-# with tfe.Session() as sess:
-# 	sess.run(tf.global_variables_initializer())
-# 	print('output  \n', sess.run(output.reveal()))
-# 	# print(model)
